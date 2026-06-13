@@ -1,597 +1,240 @@
+"""
+E-COMMERCE CHECKOUT SYSTEM
+Assignment 2 - Login System with Roles & Nested Conditions
+KIBENGE VICTOR BULASIO
+"""
 
-# Roles: admin, cashier, customer
+print("\n" + "="*60)
+print("     WELCOME TO SHOPIFY CHECKOUT")
+print("="*60)
 
-ROLES = ("customer", "cashier", "admin")
-SESSION_FILE = "session.bin"
-ENCODING = "utf-32"
+# ============================================================
+# DATABASES
+# ============================================================
 
-USERS = [
-    {
-        "fullname": "Admin User",
-        "username": "admin",
-        "password": "admin123",
-        "role": "admin",
-        "location": "jinja",
-    },
-    {
-        "fullname": "Cashier User",
-        "username": "cashier",
-        "password": "cashier123",
-        "role": "cashier",
-        "location": "mbale",
-    },
-    {
-        "fullname": "Customer User",
-        "username": "customer",
-        "password": "customer123",
-        "role": "customer",
-        "location": "fortportal",
-    },
-]
-
-PRODUCTS = [
-    {"id": "P001", "name": "Ultrabook Pro", "price": 2500000},
-    {"id": "P002", "name": "Smartphone X", "price": 900000},
-    {"id": "P003", "name": "Wireless Earbuds", "price": 120000},
-]
-
-COUPONS = {
-    "NILE5": 5,
-    "SAVE3": 3,
-    "MEGA10": 10,
-    "SHOP5": 5,
+# User database
+users = {
+    "admin": {"password": "admin123", "role": "Admin"},
+    "cashier_jesse": {"password": "cash456", "role": "Cashier"},
+    "okello_k": {"password": "okello123", "role": "Customer"},
+    "mulondo_david": {"password": "david123", "role": "Customer"}
 }
 
-TAX_RATES = {
-    "jinja": 18,
-    "mbale": 15,
-    "fortportal": 12,
-    "lira": 10,
+# Coupon database
+coupons = {
+    "WELCOME10": {"discount": 10, "min_spend": 0},
+    "SAVE20": {"discount": 20, "min_spend": 100},
+    "FLASHSALE50": {"discount": 50, "min_spend": 200},
+    "STUDENTS15": {"discount": 15, "min_spend": 50}
 }
 
-ACCESS_LEVELS = {
-    "create_product": ("admin", "cashier"),
-    "remove_product": ("admin",),
-    "view_product": ("admin", "cashier", "customer"),
-    "buy_product": ("admin", "cashier", "customer"),
-    "calculate_price": ("admin", "cashier", "customer"),
-    "create_user": ("admin",),
-    "view_users": ("admin",),
+# Tax rates
+tax_rates = {
+    "Kampala": 0.18,
+    "Entebbe": 0.16,
+    "Jinja": 0.16,
+    "Mbarara": 0.15,
+    "OTHER": 0.18
 }
 
+# ============================================================
+# LOGIN SYSTEM
+# ============================================================
 
-def print_line():
-    print("-" * 60)
+print("\n--- LOGIN ---")
 
+max_attempts = 3
+attempts = 0
+logged_in = False
+user_role = None
+current_user = None
 
-def print_title(title):
-    print_line()
-    print(title.upper().center(60))
-    print_line()
+while attempts < max_attempts and not logged_in:
+    print(f"\nAttempt {attempts + 1} of {max_attempts}")
+    username = input("Username: ").strip()
+    password = input("Password: ").strip()
+    
+    if username in users and users[username]["password"] == password:
+        logged_in = True
+        user_role = users[username]["role"]
+        current_user = username
+        print(f"\n Login successful! Welcome, {username}")
+        print(f"   Role: {user_role}")
+    else:
+        attempts += 1
+        remaining = max_attempts - attempts
+        if remaining > 0:
+            print(f" Invalid credentials. {remaining} attempts left.")
+        else:
+            print(" Too many failed attempts. Access denied.")
+            exit()
 
+print("\n" + "="*60)
+print(f"ACCESS LEVEL: {user_role}")
+print("="*60)
 
-def format_money(amount):
-    return f"UGX {amount:,.2f}"
+# ============================================================
+# PRICE CALCULATION
+# ============================================================
 
+print("\n" + "="*60)
+print("     CHECKOUT")
+print("="*60)
 
-def find_user(username):
-    username = username.strip().lower()
-    for user in USERS:
-        if user["username"].lower() == username:
-            return user
-    return None
-
-
-def set_session(user):
-    with open(SESSION_FILE, "wb") as file:
-        session_text = ",".join(
-            [user["username"], user["role"], user["location"]]
-        )
-        file.write(session_text.encode(ENCODING))
-
-
-def read_session():
+# Input subtotal
+while True:
     try:
-        with open(SESSION_FILE, "rb") as file:
-            session_text = file.read().decode(ENCODING).strip()
-    except FileNotFoundError:
-        return None
-
-    if session_text == "":
-        return None
-
-    session_parts = session_text.split(",")
-    if len(session_parts) != 3:
-        unset_session()
-        return None
-
-    username = session_parts[0]
-    role = session_parts[1]
-    location = session_parts[2]
-    return {"username": username, "role": role, "location": location}
-
-
-def unset_session():
-    with open(SESSION_FILE, "wb") as file:
-        file.write(b"")
-
-
-def get_current_user():
-    session = read_session()
-    if session is None:
-        return None
-
-    user = find_user(session["username"])
-    if user is None:
-        unset_session()
-        return None
-
-    # this prevents hardcoding a role during login
-    # the session role must match the role stored on the real user record
-    if user["role"] != session["role"]:
-        unset_session()
-        return None
-
-    return user
-
-
-def has_access(user, action):
-    if user is None:
-        return False
-    return user["role"] in ACCESS_LEVELS[action]
-
-
-def check_access(user, action):
-    if has_access(user, action):
-        return True
-
-    print("Access denied. Your role cannot perform this action.")
-    return False
-
-
-def register_user(fullname, username, password, location, role):
-    fullname = fullname.strip()
-    username = username.strip()
-    password = password.strip()
-    location = location.strip().lower()
-    role = role.strip().lower()
-
-    if fullname == "" or username == "" or password == "" or location == "":
-        return False, "All fields are required."
-
-    if role not in ROLES:
-        return False, "Invalid role."
-
-    if find_user(username) is not None:
-        return False, "Username already exists."
-
-    user = {
-        "fullname": fullname,
-        "username": username,
-        "password": password,
-        "role": role,
-        "location": location,
-    }
-    USERS.append(user)
-    return True, "User registered successfully."
-
-
-def get_confirmed_password():
-    password = ""
-    confirm_password = "_"
-
-    while password != confirm_password:
-        password = input("Enter password: ")
-        confirm_password = input("Confirm password: ")
-
-        if password != confirm_password:
-            print("Passwords do not match. Try again.")
-
-    return password
-
-
-def register_customer_flow():
-    print_title("Customer Registration")
-    fullname = input("Enter full name: ")
-    username = input("Enter username: ")
-    password = get_confirmed_password()
-    location = input("Enter location: ")
-
-    success, message = register_user(
-        fullname, username, password, location, "customer"
-    )
-    print(message)
-
-    if success:
-        user = find_user(username)
-        set_session(user)
-        print(f"Logged in as {user['fullname']} ({user['role']}).") if user else None
-
-
-def choose_role_for_new_user():
-    while True:
-        print("1. Customer")
-        print("2. Cashier")
-        print("3. Admin")
-        choice = input("Choose role: ")
-
-        if choice == "1":
-            return "customer"
-        elif choice == "2":
-            return "cashier"
-        elif choice == "3":
-            return "admin"
-        else:
-            print("Invalid role choice.")
-
-
-def admin_create_user_flow(current_user):
-    if not check_access(current_user, "create_user"):
-        return
-
-    print_title("Admin Create User")
-    fullname = input("Enter full name: ")
-    username = input("Enter username: ")
-    password = get_confirmed_password()
-    location = input("Enter location: ")
-    role = choose_role_for_new_user()
-
-    success, message = register_user(fullname, username, password, location, role)
-    print(message)
-
-
-def login(username, password):
-    user = find_user(username)
-
-    if user is None:
-        return False, "Invalid username or password."
-
-    if user["password"] != password:
-        return False, "Invalid username or password."
-
-    set_session(user)
-    return True, f"Logged in as {user['fullname']} ({user['role']})."
-
-
-def login_flow():
-    print_title("Login")
-    username = input("Enter username: ")
-    password = input("Enter password: ")
-
-    success, message = login(username, password)
-    print(message)
-
-
-def logout():
-    unset_session()
-    print("Logged out successfully.")
-
-
-def view_users(current_user):
-    if not check_access(current_user, "view_users"):
-        return
-
-    print_title("Users")
-    print(f"{'Username':<15}{'Full name':<22}{'Role':<12}{'Location':<12}")
-    print_line()
-
-    for user in USERS:
-        print(
-            f"{user['username']:<15}"
-            f"{user['fullname']:<22}"
-            f"{user['role']:<12}"
-            f"{user['location']:<12}"
-        )
-
-
-def next_product_id():
-    number = len(PRODUCTS) + 1
-    return f"P{number:03d}"
-
-
-def find_product(product_id):
-    product_id = product_id.strip().upper()
-    for product in PRODUCTS:
-        if product["id"] == product_id:
-            return product
-    return None
-
-
-def view_products(current_user):
-    if not check_access(current_user, "view_product"):
-        return
-
-    print_title("Products")
-    print(f"{'ID':<8}{'Name':<25}{'Price':>20}")
-    print_line()
-
-    for product in PRODUCTS:
-        print(
-            f"{product['id']:<8}"
-            f"{product['name']:<25}"
-            f"{format_money(product['price']):>20}"
-        )
-
-
-def add_product(current_user):
-    if not check_access(current_user, "create_product"):
-        return
-
-    print_title("Add Product")
-    name = input("Enter product name: ").strip()
-    price = get_positive_number("Enter product price: ")
-
-    product = {"id": next_product_id(), "name": name, "price": price}
-    PRODUCTS.append(product)
-    print("Product added successfully.")
-
-
-def remove_product(current_user):
-    if not check_access(current_user, "remove_product"):
-        return
-
-    view_products(current_user)
-    product_id = input("Enter product ID to remove: ")
-    product = find_product(product_id)
-
-    if product is None:
-        print("Product not found.")
-    else:
-        PRODUCTS.remove(product)
-        print("Product removed successfully.")
-
-
-def get_positive_number(prompt):
-    while True:
-        value = input(prompt)
-
-        try:
-            number = float(value)
-        except ValueError:
-            print("Enter a valid number.")
+        subtotal = float(input("\n Enter subtotal amount (UGX): "))
+        if subtotal <= 0:
+            print(" Amount must be positive.")
             continue
+        break
+    except ValueError:
+        print(" Please enter a valid number.")
 
-        if number > 0:
-            return number
+# ============================================================
+# COUPON VERIFICATION
+# ============================================================
+
+print("\n--- COUPON ---")
+coupon_code = input("Enter coupon code (or press Enter to skip): ").strip().upper()
+
+discount_amount = 0
+discount_percent = 0
+
+if coupon_code:
+    if coupon_code in coupons:
+        if subtotal >= coupons[coupon_code]["min_spend"]:
+            discount_percent = coupons[coupon_code]["discount"]
+            discount_amount = subtotal * (discount_percent / 100)
+            print(f"\n Coupon '{coupon_code}' applied!")
+            print(f"   {discount_percent}% discount - UGX {discount_amount:.2f}")
         else:
-            print("Enter a number greater than zero.")
-
-
-def get_tax_rate(location):
-    location = location.strip().lower()
-
-    # Nested conditions for different tax rates based on location.
-    if location == "jinja":
-        return 18, "Jinja tax rate"
+            min_needed = coupons[coupon_code]["min_spend"]
+            print(f"\n Coupon requires UGX {min_needed} minimum spend.")
+            print(f"   Add UGX {min_needed - subtotal:.2f} more.")
     else:
-        if location == "mbale":
-            return 15, "Mbale tax rate"
-        else:
-            if location == "fortportal":
-                return 12, "Fortportal tax rate"
-            else:
-                if location == "lira":
-                    return 10, "Lira tax rate"
-                else:
-                    return 18, "Unknown location, default tax rate used"
+        print(f"\n '{coupon_code}' is not a valid coupon.")
+else:
+    print("\n No coupon applied.")
 
+after_discount = subtotal - discount_amount
 
-def get_subtotal_discount(subtotal):
-    # Nested conditions for different discount levels based on subtotal.
-    if subtotal >= 2000000:
-        return 12, "Premium subtotal discount"
-    else:
-        if subtotal >= 1000000:
-            return 8, "High subtotal discount"
-        else:
-            if subtotal >= 500000:
-                return 5, "Medium subtotal discount"
-            else:
-                return 0, "No subtotal discount"
+# ============================================================
+# TAX CALCULATION
+# ============================================================
 
+print("\n--- TAX ---")
+print("Locations: Kampala (18%), Entebbe (16%), Jinja (16%), Mbarara (15%)")
+location = input("Enter location: ").strip().capitalize()
 
-def get_coupon_discount(coupon_code):
-    coupon_code = coupon_code.strip().upper()
+if location in tax_rates:
+    tax_rate = tax_rates[location]
+    print(f" Tax rate: {tax_rate * 100}%")
+else:
+    tax_rate = tax_rates["OTHER"]
+    print(f" Default tax rate: {tax_rate * 100}%")
 
-    # Nested condition for valid or invalid coupon codes.
-    if coupon_code != "":
-        if coupon_code in COUPONS:
-            return COUPONS[coupon_code], f"Valid coupon: {coupon_code}"
-        else:
-            return 0, f"Invalid coupon ignored: {coupon_code}"
-    else:
-        return 0, "No coupon entered"
+tax_amount = after_discount * tax_rate
+final_price = after_discount + tax_amount
 
+# ============================================================
+# LOYALTY TIERS
+# ============================================================
 
-def calculate_final_price(subtotal, coupon_code, location):
-    if subtotal <= 0:
-        return None
+print("\n--- LOYALTY DISCOUNT ---")
 
-    coupon_discount, coupon_message = get_coupon_discount(coupon_code)
-    subtotal_discount, subtotal_message = get_subtotal_discount(subtotal)
-    tax_rate, tax_message = get_tax_rate(location)
+loyalty_discount = 0
 
-    total_discount_rate = coupon_discount + subtotal_discount
+if subtotal >= 500:
+    loyalty_discount = after_discount * 0.05
+    print(f" Premium tier: 5% off (-{loyalty_discount:.2f})")
+elif subtotal >= 200:
+    loyalty_discount = after_discount * 0.03
+    print(f" Gold tier: 3% off (-{loyalty_discount:.2f})")
+elif subtotal >= 100:
+    loyalty_discount = after_discount * 0.01
+    print(f" Silver tier: 1% off (-{loyalty_discount:.2f})")
+else:
+    print(f" Basic tier: No loyalty discount")
+    print(f"   Spend UGX {100 - subtotal:.2f} more for 1% off")
 
-    # This keeps discounts realistic if a coupon plus subtotal discount is too high.
-    if total_discount_rate > 25:
-        total_discount_rate = 25
+after_loyalty = after_discount - loyalty_discount
+tax_amount = after_loyalty * tax_rate
+final_price = after_loyalty + tax_amount
 
-    discount_amount = subtotal * total_discount_rate / 100
-    amount_after_discount = subtotal - discount_amount
-    tax_amount = amount_after_discount * tax_rate / 100
-    final_price = amount_after_discount + tax_amount
+# ============================================================
+# RECEIPT
+# ============================================================
 
-    return {
-        "subtotal": subtotal,
-        "coupon_message": coupon_message,
-        "subtotal_message": subtotal_message,
-        "coupon_discount": coupon_discount,
-        "subtotal_discount": subtotal_discount,
-        "total_discount_rate": total_discount_rate,
-        "discount_amount": discount_amount,
-        "tax_message": tax_message,
-        "tax_rate": tax_rate,
-        "tax_amount": tax_amount,
-        "final_price": final_price,
-    }
+print("\n" + "="*60)
+print("                     RECEIPT")
+print("="*60)
+print(f"{'Customer:':<20} {current_user} ({user_role})")
+print("-"*60)
+print(f"{'Subtotal:':<20} UGX {subtotal:>11.2f}")
 
+if discount_amount > 0:
+    print(f"{'Coupon discount:':<20} -UGX {discount_amount:>10.2f}")
+    print(f"{'Coupon used:':<20} {coupon_code}")
 
-def show_price_breakdown(subtotal, coupon_code, location):
-    result = calculate_final_price(subtotal, coupon_code, location)
+if loyalty_discount > 0:
+    print(f"{'Loyalty discount:':<20} -UGX {loyalty_discount:>10.2f}")
 
-    if result is None:
-        print("Subtotal must be greater than zero.")
-        return
+print(f"{'After discounts:':<20} UGX {after_loyalty:>11.2f}")
+print(f"{'Tax rate:':<20} {tax_rate * 100:>11.1f}%")
+print(f"{'Tax amount:':<20} UGX {tax_amount:>11.2f}")
+print("="*60)
+print(f"{'TOTAL DUE:':<20} UGX {final_price:>11.2f}")
+print("="*60)
 
-    print_title("Price Breakdown")
-    print(f"Subtotal:             {format_money(result['subtotal'])}")
-    print(f"Coupon:               {result['coupon_message']}")
-    print(f"Subtotal discount:    {result['subtotal_message']}")
-    print(f"Coupon discount:      {result['coupon_discount']}%")
-    print(f"Subtotal discount:    {result['subtotal_discount']}%")
-    print(f"Total discount:       {result['total_discount_rate']}%")
-    print(f"Discount amount:      {format_money(result['discount_amount'])}")
-    print(f"Tax:                  {result['tax_message']} ({result['tax_rate']}%)")
-    print(f"Tax amount:           {format_money(result['tax_amount'])}")
-    print_line()
-    print(f"Final price:          {format_money(result['final_price'])}")
+# Savings
+total_saved = discount_amount + loyalty_discount
+if total_saved > 0:
+    print(f"\n You saved UGX {total_saved:.2f} today!")
 
+# ============================================================
+# ROLE-SPECIFIC ACTIONS
+# ============================================================
 
-def buy_product(current_user):
-    if not check_access(current_user, "buy_product"):
-        return
+print("\n" + "="*60)
 
-    view_products(current_user)
-    product_id = input("Enter product ID: ")
-    product = find_product(product_id)
+if user_role == "Admin":
+    print("\n ADMIN ACCESS")
+    print("-"*30)
+    print("✓ Process transactions (completed above)")
+    print("✓ View registered users")
+    print("✓ View coupons")
+    
+    admin_choice = input("\nView registered users? (yes/no): ").strip().lower()
+    
+    if admin_choice == "yes":
+        print("\n REGISTERED USERS:")
+        for user, info in users.items():
+            print(f"   • {user} ({info['role']})")
+    
+    view_coupons = input("\nView available coupons? (yes/no): ").strip().lower()
+    
+    if view_coupons == "yes":
+        print("\n AVAILABLE COUPONS:")
+        for code, info in coupons.items():
+            print(f"   • {code}: {info['discount']}% off (min ${info['min_spend']})")
+    
+    print("\n Admin session complete.")
 
-    if product is None:
-        print("Product not found.")
-        return
+elif user_role == "Cashier":
+    print("\n CASHIER: Transaction completed and logged.")
+    print("   Next customer please!")
 
-    quantity = get_positive_number("Enter quantity: ")
-    subtotal = product["price"] * quantity
-    coupon_code = input("Enter coupon code or press Enter to skip: ")
-    location = input(f"Enter location [{current_user['location']}]: ").strip()
+elif user_role == "Customer":
+    print("\n CUSTOMER: Thank you for shopping at Shopify!")
+    if total_saved > 0:
+        print(f"   You saved UGX {total_saved:.2f} today!")
 
-    if location == "":
-        location = current_user["location"]
+# ============================================================
+# END
+# ============================================================
 
-    show_price_breakdown(subtotal, coupon_code, location)
-
-
-def manual_calculation(current_user):
-    if not check_access(current_user, "calculate_price"):
-        return
-
-    print_title("Manual Final Price Calculator")
-    subtotal = get_positive_number("Enter subtotal: ")
-    coupon_code = input("Enter coupon code or press Enter to skip: ")
-    location = input(f"Enter location [{current_user['location']}]: ").strip()
-
-    if location == "":
-        location = current_user["location"]
-
-    show_price_breakdown(subtotal, coupon_code, location)
-
-
-def guest_menu():
-    print_title("NileCart Shop")
-    print("1. Register as customer")
-    print("2. Login")
-    print("3. Exit")
-
-    choice = input("Enter choice: ")
-
-    if choice == "1":
-        register_customer_flow()
-    elif choice == "2":
-        login_flow()
-    elif choice == "3":
-        print("Thank you for shopping with NileCart.")
-        return False
-    else:
-        print("Invalid choice.")
-
-    return True
-
-
-def user_menu(current_user):
-    print_title(f"{current_user['role']} dashboard")
-    print(f"Logged in as: {current_user['fullname']}")
-    print(f"Location: {current_user['location']}")
-    print_line()
-
-    print("1. View products")
-    print("2. Buy product")
-    print("3. Calculate final price manually")
-
-    if current_user["role"] == "customer":
-        print("4. Logout")
-        print("5. Exit")
-    elif current_user["role"] == "cashier":
-        print("4. Add product")
-        print("5. Logout")
-        print("6. Exit")
-    elif current_user["role"] == "admin":
-        print("4. Add product")
-        print("5. Remove product")
-        print("6. Add user")
-        print("7. View users")
-        print("8. Logout")
-        print("9. Exit")
-
-    choice = input("Enter choice: ")
-
-    if choice == "1":
-        view_products(current_user)
-    elif choice == "2":
-        buy_product(current_user)
-    elif choice == "3":
-        manual_calculation(current_user)
-    elif choice == "4":
-        if current_user["role"] == "customer":
-            logout()
-        else:
-            add_product(current_user)
-    elif choice == "5":
-        if current_user["role"] == "customer":
-            print("Thank you for shopping with NileCart.")
-            return False
-        elif current_user["role"] == "cashier":
-            logout()
-        else:
-            remove_product(current_user)
-    elif choice == "6":
-        if current_user["role"] == "cashier":
-            print("Thank you for shopping with NileCart.")
-            return False
-        elif current_user["role"] == "admin":
-            admin_create_user_flow(current_user)
-    elif choice == "7" and current_user["role"] == "admin":
-        view_users(current_user)
-    elif choice == "8" and current_user["role"] == "admin":
-        logout()
-    elif choice == "9" and current_user["role"] == "admin":
-        print("Thank you for shopping with NileCart.")
-        return False
-    else:
-        print("Invalid choice.")
-
-    return True
-
-
-def main():
-    keep_running = True
-
-    while keep_running:
-        current_user = get_current_user()
-
-        if current_user is None:
-            keep_running = guest_menu()
-        else:
-            keep_running = user_menu(current_user)
-
-
-main()
+print("\n" + "="*60)
+print("     THANK YOU FOR USING SHOPIFY")
+print("="*60)
