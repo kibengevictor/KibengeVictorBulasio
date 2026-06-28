@@ -1,0 +1,20 @@
+{
+    "REG001": {
+        "address": "123 Ngong Road, Nairobi",
+        "contact": "0712345678",
+        "program": "BSc",
+        "enrolled": "2024-09-01"
+    },
+    "REG002": {
+        "address": "45 Mombasa Road, Nairobi",
+        "contact": "0723456789",
+        "program": "BSc",
+        "enrolled": "2024-09-01"
+    },
+    "REG003": {
+        "address": "78 Thika Road, Nairobi",
+        "contact": "0734567890",
+        "program": "BBA",
+        "enrolled": "2024-09-01"
+    }
+}
