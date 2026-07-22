@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <main class="page-shell">
+        <section class="hero-panel">
+            <p class="eyebrow">Secure access</p>
+            <h1>Sign in to continue</h1>
+            <p class="hero-copy">A clean Flask login page with a simple credential check and a protected dashboard route.</p>
+        </section>
+
+        <section class="card">
+            <h2>Login</h2>
+            <p class="card-copy">Use <strong>admin</strong> and <strong>password123</strong> to test the flow.</p>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="alert" role="alert">
+                        {% for message in messages %}
+                            <p>{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <form method="post" class="login-form">
+                <label for="username">Username</label>
+                <input id="username" name="username" type="text" placeholder="Enter your username" required>
+
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" placeholder="Enter your password" required>
+
+                <button type="submit">Login</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>
